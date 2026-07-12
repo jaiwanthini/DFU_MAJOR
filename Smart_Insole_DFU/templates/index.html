@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DFU Risk Assessment Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="dashboard-container">
+        <header class="dashboard-header">
+            <div>
+                <h1>DFU Risk Assessment</h1>
+                <p>Smart Insole monitoring dashboard</p>
+            </div>
+            <div class="status-chip {{ risk_badge_class }}">
+                <span>Risk Score: {{ risk_score }}% · {{ risk_badge }}</span>
+            </div>
+        </header>
+
+        <section class="summary-cards">
+            <article class="card">
+                <h2>Risk Score</h2>
+                <p class="large-value">{{ risk_score }}%</p>
+                <p>{{ risk_message }}</p>
+            </article>
+            <article class="card">
+                <h2>SpO₂</h2>
+                <p class="large-value">{{ spo2 }} %</p>
+                <p>Perfusion Status</p>
+                <div class="status-chip {{ spo2_status_class }}">{{ spo2_status }}</div>
+            </article>
+            <article class="card">
+                <h2>Temperature Difference</h2>
+                <p class="large-value">{{ temperature_diff }}°C</p>
+                <p>Status: {{ temperature_status }}</p>
+            </article>
+            <article class="card">
+                <h2>Pressure Balance</h2>
+                <p class="large-value">EPTI</p>
+                <p class="large-value">{{ epti }}</p>
+                <div class="pressure-details">
+                    {% for label, value in regional_ptis.items() %}
+                        <div>{{ label }} : {{ value }}</div>
+                    {% endfor %}
+                </div>
+            </article>
+        </section>
+
+        <section class="main-grid">
+            <div class="panel">
+                <h3>Pressure Distribution</h3>
+                <canvas id="pressureChart"></canvas>
+            </div>
+            <div class="panel">
+                <h3>Foot Pressure Snapshot</h3>
+                <div class="pressure-visualization">
+                    <div class="sensor-row">
+                        <div class="sensor-box">Heel<br>{{ pressure_snapshot_values[0] }}%</div>
+                        <div class="sensor-box">Midfoot<br>{{ pressure_snapshot_values[1] }}%</div>
+                        <div class="sensor-box">Forefoot<br>{{ pressure_snapshot_values[2] }}%</div>
+                        <div class="sensor-box">Toe<br>{{ pressure_snapshot_values[3] }}%</div>
+                    </div>
+                    <div class="pressure-details info-list">
+                        <div class="info-item"><span>Patient ID</span><strong>{{ patient_id }}</strong></div>
+                        <div class="info-item"><span>Last Update</span><strong>{{ last_update }}</strong></div>
+                        <div class="info-item"><span>System Status</span><strong>{{ status }}</strong></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="/static/script.js"></script>
+    <script>
+        const chartLabels = {{ pressure_chart_labels | tojson }};
+        const chartValues = {{ pressure_chart_values | tojson }};
+        initializePressureChart(chartLabels, chartValues);
+    </script>
+</body>
+</html>

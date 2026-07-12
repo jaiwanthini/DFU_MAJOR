@@ -1,0 +1,10 @@
+numpy
+pandas
+matplotlib
+scikit-learn
+tensorflow
+scipy
+jupyter
+pyserial
+bleak
+flask

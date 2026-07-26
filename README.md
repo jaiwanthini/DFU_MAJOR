@@ -7,6 +7,16 @@ An AI-powered smart insole system that monitors plantar pressure, temperature, h
 and SpO₂ in diabetic patients — predicting ulcer risk in real time, with every prediction explained.
 </div>
 
+<div align="center">
+
+<img src="docs/dashboard.mp4" alt="PadaDrishti Dashboard Demo" width="95%">
+
+<br><br>
+
+<i>🎥 Live Dashboard Demonstration</i>
+
+</div>
+
 ## 📖 Overview
 
 Diabetic foot ulcers (DFUs) are one of the leading causes of preventable amputation in diabetic patients — and they're detectable *before* they form, if the right signals are tracked continuously.

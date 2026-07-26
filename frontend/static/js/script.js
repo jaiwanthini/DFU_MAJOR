@@ -1,5 +1,5 @@
 /* ===========================================================
-   PODOS — DFU RISK COCKPIT
+   PADADRISHTI — DFU RISK COCKPIT
    All UI state is driven through the update*(data) functions
    at the bottom of this file. Wire these to your Flask API /
    WebSocket feed — everything above them is just rendering.
@@ -47,7 +47,7 @@ function renderGreeting() {
   const now = new Date();
   const hour = now.getHours();
   const greet = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-  greetingEl.textContent = `${greet}, Dr. Rao`;
+  greetingEl.textContent = `${greet}, Y/N`;
   dateEl.textContent = now.toLocaleDateString(undefined, {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   });

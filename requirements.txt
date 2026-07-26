@@ -1,0 +1,35 @@
+# ===============================
+# Smart Insole DFU Risk Prediction
+# Requirements
+# ===============================
+
+# Data Processing
+numpy>=1.26.0
+pandas>=2.2.0
+openpyxl>=3.1.2
+
+# Machine Learning
+scikit-learn>=1.5.0
+tensorflow>=2.17.0
+joblib>=1.4.2
+
+# Explainable AI
+shap>=0.46.0
+
+# Visualization
+matplotlib>=3.9.0
+plotly>=5.22.0
+
+# Web Framework
+Flask>=3.0.3
+Flask-Cors>=5.0.0
+
+# Database
+SQLAlchemy>=2.0.32
+
+# Utilities
+tqdm>=4.66.4
+python-dotenv>=1.0.1
+
+# BLE Communication (Future ESP32 Integration)
+bleak>=0.22.2

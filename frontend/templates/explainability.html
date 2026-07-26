@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% set active_page = 'explainability' %}
+
+{% block content %}
+      <!-- EXPLAINABLE AI -->
+      <section class="panel panel--xai span-7">
+        <div class="panel__head">
+          <div>
+            <p class="eyebrow">Explainability &middot; SHAP</p>
+            <h2>Why this reading</h2>
+          </div>
+        </div>
+        <p class="xai__narrative" id="xaiNarrative">Awaiting first inference to explain contributing signals.</p>
+        <div class="xai__columns">
+          <div class="xai__col">
+            <h4><i data-lucide="trending-up"></i> Increasing risk</h4>
+            <ul id="xaiPositive"></ul>
+          </div>
+          <div class="xai__col">
+            <h4><i data-lucide="trending-down"></i> Decreasing risk</h4>
+            <ul id="xaiNegative"></ul>
+          </div>
+        </div>
+      </section>
+{% endblock %}

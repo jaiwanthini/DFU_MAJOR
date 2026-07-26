@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% set active_page = 'patient' %}
+
+{% block content %}
+      <!-- PATIENT PANEL -->
+      <aside class="panel panel--patient span-4">
+        <div class="panel__head">
+          <div>
+            <p class="eyebrow">Manifest</p>
+            <h2>Patient</h2>
+          </div>
+        </div>
+        <div class="patient__id">
+          <div class="avatar avatar--lg" id="patientInitials">--</div>
+          <div>
+            <h3 id="patientName">&mdash;</h3>
+            <p id="patientMeta">&mdash;</p>
+          </div>
+        </div>
+        <dl class="patient__stats" id="patientStats"><!-- injected --></dl>
+      </aside>
+{% endblock %}

@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% set active_page = 'prediction_log' %}
+
+{% block content %}
+      <!-- PREDICTION HISTORY -->
+      <section class="panel span-7 panel--history">
+        <div class="panel__head">
+          <div>
+            <p class="eyebrow">Log</p>
+            <h2>Prediction History</h2>
+          </div>
+        </div>
+        <ol class="timeline" id="historyTimeline"><!-- injected --></ol>
+      </section>
+{% endblock %}

@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+{% set active_page = 'insole_feed' %}
+
+{% block content %}
+      <!-- FOOT SCHEMATIC + SENSOR HUD -->
+      <section class="panel panel--hud span-8">
+        <div class="panel__head">
+          <div>
+            <p class="eyebrow">Live insole feed</p>
+            <h2>Sensor Schematic</h2>
+          </div>
+          <div class="panel__pill">
+            <span class="dot dot--live"></span> Streaming
+          </div>
+        </div>
+
+        <div class="hud">
+          <svg class="hud__foot" viewBox="0 0 320 520" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Smart insole sensor map">
+            <path d="M160 20c-34 0-46 34-46 62 0 20 8 34 8 54 0 22-30 40-46 78-16 40-24 96-24 140 0 70 30 146 108 146s108-76 108-146c0-44-8-100-24-140-16-38-46-56-46-78 0-20 8-34 8-54 0-28-12-62-46-62z"
+              stroke="var(--line)" stroke-width="2" fill="var(--foot-fill)"/>
+            <!-- toe cluster -->
+            <circle cx="128" cy="52" r="10" class="node" fill="none"/>
+            <circle cx="160" cy="38" r="10" class="node" fill="none"/>
+            <circle cx="192" cy="52" r="10" class="node" fill="none"/>
+            <!-- forefoot: FSR1 / FSR2 -->
+            <circle id="nodeFSR1" cx="118" cy="150" r="16" class="node node--active" data-sensor="fsr1"/>
+            <circle id="nodeFSR2" cx="202" cy="150" r="16" class="node node--active" data-sensor="fsr2"/>
+            <!-- midfoot: temp -->
+            <circle id="nodeTemp" cx="160" cy="270" r="14" class="node node--active" data-sensor="temp"/>
+            <!-- heel: FSR3 / FSR4 -->
+            <circle id="nodeFSR3" cx="128" cy="400" r="18" class="node node--active" data-sensor="fsr3"/>
+            <circle id="nodeFSR4" cx="192" cy="400" r="18" class="node node--active" data-sensor="fsr4"/>
+          </svg>
+
+          <div class="hud__readouts">
+            <div class="lead" data-lead="fsr1"></div>
+            <div class="lead" data-lead="fsr2"></div>
+            <div class="lead" data-lead="temp"></div>
+            <div class="lead" data-lead="fsr3"></div>
+            <div class="lead" data-lead="fsr4"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PRESSURE HEATMAP -->
+      <section class="panel panel--heatmap span-5">
+        <div class="panel__head">
+          <div>
+            <p class="eyebrow">Plantar pressure</p>
+            <h2>Heatmap</h2>
+          </div>
+        </div>
+        <svg class="heatmap" viewBox="0 0 220 380" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M110 12c-24 0-32 24-32 44 0 14 6 24 6 38 0 16-22 28-32 56-12 28-16 68-16 100 0 50 22 104 74 104s74-54 74-104c0-32-4-72-16-100-10-28-32-40-32-56 0-14 6-24 6-38 0-20-8-44-32-44z"
+            stroke="var(--line)" stroke-width="1.5" fill="var(--foot-fill)"/>
+          <ellipse id="heatForefoot" cx="80" cy="112" rx="26" ry="30" class="heat-zone"/>
+          <ellipse id="heatForefoot2" cx="140" cy="112" rx="26" ry="30" class="heat-zone"/>
+          <ellipse id="heatMid" cx="110" cy="200" rx="30" ry="34" class="heat-zone"/>
+          <ellipse id="heatHeel" cx="110" cy="300" rx="40" ry="42" class="heat-zone"/>
+        </svg>
+        <div class="heat-scale">
+          <span>Low</span>
+          <div class="heat-scale__bar"></div>
+          <span>High</span>
+        </div>
+      </section>
+
+      <!-- LIVE SENSOR CARDS -->
+      <section class="span-8 sensor-row" id="sensorRow">
+        <!-- injected by script.js: renderSensorCards() -->
+      </section>
+{% endblock %}

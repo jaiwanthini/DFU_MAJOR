@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% set active_page = 'prediction' %}
+
+{% block content %}
+      <!-- RISK GAUGE -->
+      <section class="panel panel--gauge span-4">
+        <div class="panel__head">
+          <div>
+            <p class="eyebrow">Prediction</p>
+            <h2>DFU Risk</h2>
+          </div>
+        </div>
+
+        <div class="gauge">
+          <svg viewBox="0 0 240 240" class="gauge__dial">
+            <circle cx="120" cy="120" r="100" class="gauge__track"/>
+            <circle cx="120" cy="120" r="100" class="gauge__progress" id="gaugeProgress"
+              stroke-dasharray="628.3" stroke-dashoffset="628.3" pathLength="628.3"/>
+            <g class="gauge__ticks" id="gaugeTicks"></g>
+          </svg>
+          <div class="gauge__center">
+            <span class="gauge__score" id="gaugeScore">--</span>
+            <span class="gauge__label" id="gaugeLabel">Awaiting data</span>
+          </div>
+        </div>
+
+        <div class="gauge__confidence">
+          <span>Model confidence</span>
+          <div class="meter"><div class="meter__fill" id="confidenceFill"></div></div>
+          <span class="mono" id="confidenceValue">--%</span>
+        </div>
+      </section>
+{% endblock %}

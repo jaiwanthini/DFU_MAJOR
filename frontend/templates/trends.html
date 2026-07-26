@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% set active_page = 'trends' %}
+
+{% block content %}
+      <!-- TREND CHARTS -->
+      <section class="panel span-12 panel--trends">
+        <div class="panel__head">
+          <div>
+            <p class="eyebrow">Telemetry history</p>
+            <h2>Trends</h2>
+          </div>
+          <div class="tabs" id="trendTabs">
+            <button class="tab is-active" data-metric="pressure">Pressure</button>
+            <button class="tab" data-metric="temperature">Temperature</button>
+            <button class="tab" data-metric="vitals">Heart Rate / SpO₂</button>
+            <button class="tab" data-metric="risk">Risk Score</button>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="trendChart"></canvas>
+        </div>
+      </section>
+{% endblock %}

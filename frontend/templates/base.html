@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Podos &mdash; DFU Risk Cockpit</title>
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+<!-- Icons -->
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+
+<!-- Charts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+
+<div class="cockpit">
+
+  <!-- ============ LEFT INSTRUMENT RAIL ============ -->
+  <aside class="rail" id="rail">
+    <div class="rail__brand">
+      <span class="rail__mark">P</span>
+      <span class="rail__wordmark">Podos</span>
+      <button class="rail__collapse" id="railToggle" aria-label="Collapse sidebar">
+        <i data-lucide="panel-left-close"></i>
+      </button>
+    </div>
+
+    <nav class="rail__nav">
+      <a href="{{ url_for('dashboard') }}" class="rail__item {% if active_page == 'dashboard' %}is-active{% endif %}">
+        <i data-lucide="gauge-circle"></i><span>Cockpit</span>
+      </a>
+      <a href="{{ url_for('insole_feed') }}" class="rail__item {% if active_page == 'insole_feed' %}is-active{% endif %}">
+        <i data-lucide="footprints"></i><span>Insole Feed</span>
+      </a>
+      <a href="{{ url_for('explainability') }}" class="rail__item {% if active_page == 'explainability' %}is-active{% endif %}">
+        <i data-lucide="brain-circuit"></i><span>Explainability</span>
+      </a>
+      <a href="{{ url_for('trends') }}" class="rail__item {% if active_page == 'trends' %}is-active{% endif %}">
+        <i data-lucide="line-chart"></i><span>Trends</span>
+      </a>
+      <a href="{{ url_for('prediction_log') }}" class="rail__item {% if active_page == 'prediction_log' %}is-active{% endif %}">
+        <i data-lucide="history"></i><span>Prediction Log</span>
+      </a>
+      <a href="{{ url_for('patient') }}" class="rail__item {% if active_page == 'patient' %}is-active{% endif %}">
+        <i data-lucide="user-round"></i><span>Patient File</span>
+      </a>
+      <a href="{{ url_for('system') }}" class="rail__item {% if active_page == 'system' %}is-active{% endif %}">
+        <i data-lucide="settings-2"></i><span>System</span>
+      </a>
+    </nav>
+
+    <div class="rail__foot">
+      <div class="rail__ble">
+        <span class="dot dot--live"></span>
+        <span>BLE Linked</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN COLUMN ============ -->
+  <div class="main">
+
+    <!-- ---- TOP STATUS STRIP ---- -->
+    <header class="statusbar">
+      <div class="statusbar__left">
+        <button class="icon-btn only-mobile" id="railToggleMobile"><i data-lucide="menu"></i></button>
+        <div class="statusbar__greeting">
+          <h1 id="greetingText">Good morning, Dr. Rao</h1>
+          <p id="dateText">&mdash;</p>
+        </div>
+      </div>
+
+      <div class="statusbar__telemetry">
+        <div class="tele">
+          <span class="tele__label">Model</span>
+          <span class="tele__value tele__value--good">LSTM &middot; Live</span>
+        </div>
+        <div class="tele">
+          <span class="tele__label">Latency</span>
+          <span class="tele__value" id="teleLatency">42 ms</span>
+        </div>
+        <div class="tele">
+          <span class="tele__label">Uptime</span>
+          <span class="tele__value" id="teleUptime">03:14:09</span>
+        </div>
+      </div>
+
+      <div class="statusbar__right">
+        <button class="icon-btn"><i data-lucide="bell"></i></button>
+        <div class="avatar">DR</div>
+      </div>
+    </header>
+
+    <!-- ---- DASHBOARD GRID ---- -->
+    <main class="grid">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

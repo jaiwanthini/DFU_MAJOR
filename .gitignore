@@ -1,31 +1,15 @@
-# Python virtual environment
-venv/
 .venv/
-env/
-
-# Python bytecode
 __pycache__/
-*.py[cod]
-*$py.class
-
-# Jupyter
-.ipynb_checkpoints/
-
-# IDE/editor
-.vscode/
+logs/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
 .idea/
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Local env files
-.env
-.env.*
-
-# Model/data artifacts (optional)
-*.keras
-*.h5
-*.pkl
-*.joblib
-*.npy
+.vscode/
+*.log

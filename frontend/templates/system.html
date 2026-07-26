@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% set active_page = 'system' %}
+
+{% block content %}
+      <!-- SYSTEM STATUS -->
+      <section class="panel span-5 panel--system">
+        <div class="panel__head">
+          <div>
+            <p class="eyebrow">Diagnostics</p>
+            <h2>System Status</h2>
+          </div>
+        </div>
+        <ul class="status-list" id="systemStatus"><!-- injected --></ul>
+      </section>
+{% endblock %}

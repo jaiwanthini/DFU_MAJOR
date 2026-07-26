@@ -9,7 +9,7 @@ and SpO₂ in diabetic patients — predicting ulcer risk in real time, with eve
 
 <div align="center">
 
-<img src="docs/dashboard.mp4" alt="PadaDrishti Dashboard Demo" width="95%">
+<img src="docs/dashboard.gif" alt="PadaDrishti Dashboard Demo" width="95%">
 
 <br><br>
 
@@ -176,14 +176,14 @@ pip install -r requirements.txt
 python app.py
 ```
 
-The dashboard will be available at `http://localhost:5000`.
+The dashboard will be available at `http://localhost:5500`.
 
 <br/>
 
 ## 🧭 Usage
 
 1. **Start the backend** — `python app.py` boots the Flask server and loads the trained LSTM model.
-2. **Open the dashboard** — navigate to `http://localhost:5000` in your browser.
+2. **Open the dashboard** — navigate to `http://localhost:5500` in your browser.
 3. **Run the simulator** — the insole simulator starts emitting synthetic sensor readings automatically; toggle it via `GET /simulate`.
 4. **Observe predictions** — the risk gauge updates live as each new sensor window is processed.
 5. **View SHAP explanations** — the Explainability panel shows which features pushed the risk score up or down, in plain language.

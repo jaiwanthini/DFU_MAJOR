@@ -1,43 +1,11 @@
 <div align="center">
 
-# 🦶 Podos
+# पाददृष्टि
+(*Every Step. Every Signal. Every Insight.*)
 
-### Smart Insole for Early Detection of Diabetic Foot Ulcer Risk
-**using LSTM and Explainable AI**
-
-<p>
 An AI-powered smart insole system that monitors plantar pressure, temperature, heart rate,<br/>
 and SpO₂ in diabetic patients — predicting ulcer risk in real time, with every prediction explained.
-</p>
-
-<p>
-  <img src="https://img.shields.io/badge/python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white" />
-  <img src="https://img.shields.io/badge/flask-2.3-000000?style=flat-square&logo=flask&logoColor=white" />
-  <img src="https://img.shields.io/badge/tensorflow-2.x-FF6F00?style=flat-square&logo=tensorflow&logoColor=white" />
-  <img src="https://img.shields.io/badge/SHAP-explainable%20AI-8A2BE2?style=flat-square" />
-  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" />
-  <img src="https://img.shields.io/badge/status-active%20development-blue?style=flat-square" />
-</p>
-
-<p>
-  <a href="#-features">Features</a> ·
-  <a href="#-architecture">Architecture</a> ·
-  <a href="#-installation">Installation</a> ·
-  <a href="#-api-reference">API</a> ·
-  <a href="#-model">Model</a> ·
-  <a href="#-roadmap">Roadmap</a>
-</p>
-
 </div>
-
-<br/>
-
-<div align="center">
-<img src="docs/screenshots/dashboard.png" alt="Podos Dashboard" width="850"/>
-<p><i>Live cockpit view — sensor telemetry, DFU risk gauge, and explainability, in one screen.</i></p>
-</div>
-
-<br/>
 
 ## 📖 Overview
 

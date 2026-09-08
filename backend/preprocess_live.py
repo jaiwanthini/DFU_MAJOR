@@ -12,12 +12,12 @@ a 30-second rolling window deque.
 import os
 import sys
 import logging
-from collections import deque
 from typing import Dict, Any, Tuple, Optional
 
 import numpy as np
 import pandas as pd
 import joblib
+
 # ----------------------------------------------------------
 # Project Root
 # ----------------------------------------------------------
@@ -25,7 +25,7 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
-from config import WINDOW_SIZE, SCALER_PATH
+from config import SEQUENCE_WINDOW, ROLLING_WINDOW, SCALER_PATH, MODEL_FEATURE_COLUMNS
 from backend.risk import calculate_risk_score
 
 
@@ -33,44 +33,24 @@ class LivePreprocessor:
     """
     Maintains a rolling window of live sensor data.
     Computes all engineered features on the fly.
-    Returns (sequence, base_risk_score) when WINDOW_SIZE is reached.
+    Returns (sequence, base_risk_score) when SEQUENCE_WINDOW is reached.
+    Maintains a 30-second rolling buffer for clinical features.
     """
 
-    # Must match EXACTLY the order used during training (sequence_generator.py)
-    FEATURE_COLUMNS = [
-        "avg_pressure",
-        "max_pressure",
-        "pressure_std",
-        "heel_ratio",
-        "mid_ratio",
-        "forefoot_ratio",
-        "toe_ratio",
-        "temperature",
-        "spo2",
-        "heart_rate",
-        "temp_diff",
-        "hr_diff",
-        "spo2_diff",
-        "avg_pressure_rolling_mean",
-        "temperature_rolling_mean",
-        "heart_rate_rolling_mean",
-        "spo2_rolling_mean",
-        "recovery_factor"
-    ]
-
-    def __init__(self, window_size: int = WINDOW_SIZE):
+    def __init__(self, sequence_window: int = SEQUENCE_WINDOW, rolling_window: int = ROLLING_WINDOW):
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.window_size = window_size
+        self.sequence_window = sequence_window
+        self.rolling_window = rolling_window
         
-        # Deque for maintaining the rolling window of fully processed feature rows
-        self.history = deque(maxlen=window_size)
+        # Buffer needs to hold enough for rolling features, so we use rolling_window
+        self.buffer = pd.DataFrame(columns=MODEL_FEATURE_COLUMNS)
         
-        # Deque for raw values to compute trends (diffs)
-        self.raw_history = deque(maxlen=window_size)
-
+        # Explicit stateful causality for the session
+        self.session_pressures = []
+        
         # Load StandardScaler identically to training pipeline
         scaler_full_path = os.path.join(ROOT_DIR, SCALER_PATH)
-        self.logger.info(f"Loading StandardScaler from: {scaler_full_path}")
+        self.logger.info(f"Loading Scaler from: {scaler_full_path}")
         if not os.path.exists(scaler_full_path):
             raise RuntimeError(f"Scaler missing at {scaler_full_path}")
             
@@ -84,21 +64,29 @@ class LivePreprocessor:
             sys.modules['numpy._core.multiarray'] = numpy.core.multiarray
             
         self.scaler = joblib.load(scaler_full_path)
+        
+        # Runtime Validations
+        assert len(MODEL_FEATURE_COLUMNS) == 28, f"Expected 28 features, got {len(MODEL_FEATURE_COLUMNS)}"
+        assert len(MODEL_FEATURE_COLUMNS) == self.scaler.n_features_in_, f"Scaler expects {self.scaler.n_features_in_} features, but {len(MODEL_FEATURE_COLUMNS)} are defined."
 
     def reset(self) -> None:
         """
         Clears the current live rolling windows.
         Useful when switching patients or resetting the simulation.
         """
-        self.history.clear()
-        self.raw_history.clear()
-        self.logger.info("LivePreprocessor buffers have been reset.")
+        self.clear()
+        
+    def clear(self) -> None:
+        """Resets the live window (e.g. for a new patient or session)."""
+        self.buffer = pd.DataFrame(columns=MODEL_FEATURE_COLUMNS)
+        self.session_pressures.clear()
+        self.logger.info("Live preprocessor history cleared.")
 
     def get_buffer_size(self) -> int:
         """
         Returns the number of processed frames currently buffered in the window.
         """
-        return len(self.history)
+        return len(self.buffer)
 
     def process_reading(self, raw_data: Dict[str, Any]) -> Optional[Tuple[np.ndarray, float]]:
         """
@@ -114,7 +102,7 @@ class LivePreprocessor:
         Returns
         -------
         Tuple[np.ndarray, float] or None
-            (Sequence of shape (1, 30, 18), base_risk_score) if window full, else None
+            (Sequence of shape (1, seq, 28), base_risk_score) if window full, else None
         """
         try:
             # 1. Parse raw values safely
@@ -123,95 +111,110 @@ class LivePreprocessor:
             fsr3 = float(raw_data.get("fsr3", 0.0))
             fsr4 = float(raw_data.get("fsr4", 0.0))
             
-            temperature = float(raw_data.get("temperature", 36.0))
+            temperature = float(raw_data.get("temperature", 31.0))
             spo2 = float(raw_data.get("spo2", 98.0))
-            heart_rate = float(raw_data.get("heart_rate", 80.0))
+            heart_rate = float(raw_data.get("heart_rate", 60.0))
             
-            # Save raw state for diff calculations
-            self.raw_history.append({
-                "temperature": temperature,
-                "spo2": spo2,
-                "heart_rate": heart_rate
-            })
-
             fsr = [fsr1, fsr2, fsr3, fsr4]
             total_pressure = sum(fsr)
-            # Prevent division by zero
-            safe_total = total_pressure if total_pressure > 0 else 1.0
 
             # 2. Compute Base Features
-            features = {
-                "avg_pressure": np.mean(fsr),
+            avg_pressure = np.mean(fsr)
+            self.session_pressures.append(avg_pressure)
+            
+            # Use ddof=1 for variance/std to match pandas exactly (sample variance)
+            if len(fsr) > 1:
+                pressure_var = np.var(fsr, ddof=1)
+                pressure_std = np.std(fsr, ddof=1)
+            else:
+                pressure_var = 0.0
+                pressure_std = 0.0
+
+            pressure_stability = pressure_std / (avg_pressure + 1e-6)
+            cop_approx = ((fsr1 + fsr2) - (fsr3 + fsr4)) / (total_pressure + 1e-6)
+            pressure_symmetry = abs(fsr2 - fsr3) / (fsr2 + fsr3 + 1e-6)
+            
+            new_row = {
+                "avg_pressure": avg_pressure,
                 "max_pressure": np.max(fsr),
-                "pressure_std": np.std(fsr),
-                "heel_ratio": fsr1 / safe_total,
-                "mid_ratio": fsr2 / safe_total,
-                "forefoot_ratio": fsr3 / safe_total,
-                "toe_ratio": fsr4 / safe_total,
+                "min_pressure": np.min(fsr),
+                "pressure_var": pressure_var,
+                "pressure_std": pressure_std,
+                "pressure_stability": pressure_stability,
+                "cop_approx": cop_approx,
+                "pressure_symmetry": pressure_symmetry,
                 "temperature": temperature,
                 "spo2": spo2,
-                "heart_rate": heart_rate
+                "heart_rate": heart_rate,
+                "pressure_temp_interaction": avg_pressure * temperature,
+                "pressure_hr_interaction": avg_pressure * heart_rate,
+                "temp_hr_interaction": temperature * heart_rate
             }
 
             # 3. Compute Temporal Trends (Diffs)
-            if len(self.raw_history) >= 2:
-                prev = self.raw_history[-2]
-                features["temp_diff"] = temperature - prev["temperature"]
-                features["hr_diff"] = heart_rate - prev["heart_rate"]
-                features["spo2_diff"] = spo2 - prev["spo2"]
+            if not self.buffer.empty:
+                prev = self.buffer.iloc[-1]
+                new_row["temp_diff"] = temperature - prev["temperature"]
+                new_row["hr_diff"] = heart_rate - prev["heart_rate"]
+                new_row["spo2_diff"] = spo2 - prev["spo2"]
+                new_row["pressure_change_rate"] = avg_pressure - prev["avg_pressure"]
+                new_row["pressure_gradient"] = new_row["pressure_change_rate"] - prev["pressure_change_rate"]
             else:
-                features["temp_diff"] = 0.0
-                features["hr_diff"] = 0.0
-                features["spo2_diff"] = 0.0
-
-            # 4. Compute Rolling Means
-            # We use the current history + this new frame to calculate rolling metrics
-            hist_list = list(self.history)
-            hist_list.append(features)
-
-            features["avg_pressure_rolling_mean"] = np.mean([x["avg_pressure"] for x in hist_list])
-            features["temperature_rolling_mean"] = np.mean([x["temperature"] for x in hist_list])
-            features["heart_rate_rolling_mean"] = np.mean([x["heart_rate"] for x in hist_list])
-            features["spo2_rolling_mean"] = np.mean([x["spo2"] for x in hist_list])
-
-            # 5. Compute Recovery Factor
-            # In prepare_data.py, baseline is patient median. Here, we approximate 
-            # the baseline using the median of the current rolling window.
-            avg_pressures = [x["avg_pressure"] for x in hist_list]
-            baseline = np.median(avg_pressures)
-            if baseline <= 0:
-                baseline = 1e-5
+                new_row["temp_diff"] = 0.0
+                new_row["hr_diff"] = 0.0
+                new_row["spo2_diff"] = 0.0
+                new_row["pressure_change_rate"] = 0.0
+                new_row["pressure_gradient"] = 0.0
                 
-            rf = (baseline - features["avg_pressure"]) / baseline
-            features["recovery_factor"] = np.clip(rf, 0.0, 1.0)
+            new_row["loading_rate"] = new_row["pressure_change_rate"] if new_row["pressure_change_rate"] > 0 else 0.0
+            new_row["unloading_rate"] = abs(new_row["pressure_change_rate"]) if new_row["pressure_change_rate"] < 0 else 0.0
 
-            # Append finalized features to history
-            self.history.append(features)
+            # Add to buffer
+            self.buffer = pd.concat([self.buffer, pd.DataFrame([new_row])], ignore_index=True)
 
+            # 4. Compute Rolling Means and Integrals
+            self.buffer["avg_pressure_rolling_mean"] = self.buffer["avg_pressure"].rolling(self.rolling_window, min_periods=1).mean()
+            self.buffer["temperature_rolling_mean"] = self.buffer["temperature"].rolling(self.rolling_window, min_periods=1).mean()
+            self.buffer["heart_rate_rolling_mean"] = self.buffer["heart_rate"].rolling(self.rolling_window, min_periods=1).mean()
+            self.buffer["spo2_rolling_mean"] = self.buffer["spo2"].rolling(self.rolling_window, min_periods=1).mean()
+            self.buffer["pressure_integral"] = self.buffer["avg_pressure"].rolling(self.rolling_window, min_periods=1).sum()
+
+            # 5. Compute explicitly stateful features (Recovery and Duration)
+            baseline = np.median(self.session_pressures)
+            
+            # We recalculate these for the entire buffer because the baseline changes slightly each step,
+            # but we only really need it for the current row to be mathematically identical to the expanding median.
+            current_idx = len(self.buffer) - 1
+            
+            recovery_val = (baseline - avg_pressure) / (baseline + 1e-6)
+            self.buffer.at[current_idx, "recovery_factor"] = max(0.0, min(recovery_val, 1.0))
+            
+            if "is_high" not in self.buffer.columns:
+                self.buffer["is_high"] = 0
+                
+            self.buffer.at[current_idx, "is_high"] = 1 if (avg_pressure > baseline) else 0
+            self.buffer["pressure_duration"] = self.buffer["is_high"].rolling(self.rolling_window, min_periods=1).sum()
+
+            # Keep only what we need for rolling features
+            if len(self.buffer) > self.rolling_window * 2:
+                self.buffer = self.buffer.iloc[-self.rolling_window:].reset_index(drop=True)
+            
             # 6. Check if Window is Full
-            if len(self.history) == self.window_size:
+            if len(self.buffer) >= self.sequence_window:
+                seq_df = self.buffer.iloc[-self.sequence_window:].copy()
                 
-                # Extract features in the EXACT order defined by FEATURE_COLUMNS
-                sequence = []
-                for item in self.history:
-                    row = [float(item[col]) for col in self.FEATURE_COLUMNS]
-                    sequence.append(row)
-                    
-                seq_arr = np.array(sequence, dtype=np.float32)
+                # Reorder to MODEL_FEATURE_COLUMNS
+                features_data = seq_df[MODEL_FEATURE_COLUMNS].values
                 
-                # Reshape to 2D for scaling
-                seq_2d = seq_arr.reshape(self.window_size, len(self.FEATURE_COLUMNS))
+                # Apply scaling
+                scaled_features = self.scaler.transform(features_data)
                 
-                # Apply scaling EXACTLY as done in training
-                seq_scaled_2d = self.scaler.transform(seq_2d)
+                # Reshape to 3D for LSTM (1, seq_window, features)
+                seq_arr = scaled_features.reshape(1, self.sequence_window, len(MODEL_FEATURE_COLUMNS))
                 
-                # Reshape back to 3D for LSTM (1, 30, 18)
-                seq_arr = seq_scaled_2d.reshape(1, self.window_size, len(self.FEATURE_COLUMNS))
-                
-                # 7. Compute Rule-based Risk Score 
-                # Reuses the exact clinically justified function from sequence_generator.py
+                # 7. Compute Rule-based Risk Score
                 try:
-                    latest_row = pd.Series(features)
+                    latest_row = seq_df.iloc[-1]
                     base_risk_score = float(calculate_risk_score(latest_row))
                 except Exception as e:
                     self.logger.error(f"Error calculating base risk score: {e}")
@@ -219,15 +222,9 @@ class LivePreprocessor:
                 
                 return seq_arr, base_risk_score
 
-            # Window not yet full (gathering 30 seconds of data)
+            # Window not yet full (gathering SEQUENCE_WINDOW of data)
             return None
 
         except Exception as e:
             self.logger.exception(f"Error processing live reading: {e}")
             raise RuntimeError(f"Live preprocessing failed: {e}")
-
-    def clear(self) -> None:
-        """Resets the live window (e.g. for a new patient or session)."""
-        self.history.clear()
-        self.raw_history.clear()
-        self.logger.info("Live preprocessor history cleared.")

@@ -7,7 +7,7 @@
 # File Paths
 # -------------------------------
 
-RAW_DATA_PATH        = "data/raw/dfu_raw_dataset_50000.csv"
+RAW_DATA_PATH        = "data/raw/dfu_raw_dataset_100000.csv"
 PATIENT_PROFILE_PATH = "data/raw/patient_profile.xlsx"
 PROCESSED_DATA_PATH  = "data/processed/dfu_processed_dataset.csv"
 SEQUENCE_DATA_PATH   = "data/sequences/"
@@ -21,14 +21,17 @@ CLASS_WEIGHTS_PATH   = "models/class_weights.pkl"
 # Window Parameters
 # -------------------------------
 
-WINDOW_SIZE   = 30   # seconds per sequence
+SEQUENCE_WINDOW = 3 # seconds per sequence (for LSTM temporal dimension)
+ROLLING_WINDOW  = 30 # seconds (for clinical rolling features like sustained pressure)
 SAMPLING_RATE = 1    # readings per second
 
 # -------------------------------
 # Train / Test Split
 # -------------------------------
 
-TRAIN_TEST_SPLIT = 0.20
+TRAIN_SPLIT = 0.70
+VAL_SPLIT   = 0.15
+TEST_SPLIT  = 0.15
 RANDOM_STATE     = 42
 
 # -------------------------------
@@ -93,32 +96,75 @@ IMBALANCE_THRESHOLD = 0.70   # 70 %
 # -------------------------------
 
 BATCH_SIZE    = 64
-EPOCHS        = 50
-LEARNING_RATE = 0.001
+EPOCHS        = 100
+LEARNING_RATE = 0.0005  # Task 3: Reduced from 0.001 to 0.0005
+RECURRENT_DROPOUT = 0.1
+
 # -------------------------------
 # Feature Information
 # -------------------------------
-NUM_FEATURES = 18
+NUM_FEATURES = 28
+
+MODEL_FEATURE_COLUMNS = [
+    "avg_pressure",
+    "max_pressure",
+    "min_pressure",
+    "pressure_var",
+    "pressure_std",
+    "pressure_gradient",
+    "pressure_change_rate",
+    "pressure_stability",
+    "cop_approx",
+    "pressure_symmetry",
+    "temp_diff",
+    "temperature_rolling_mean",
+    "hr_diff",
+    "heart_rate_rolling_mean",
+    "spo2_diff",
+    "spo2_rolling_mean",
+    "pressure_temp_interaction",
+    "pressure_hr_interaction",
+    "temp_hr_interaction",
+    "pressure_integral",
+    "recovery_factor",
+    "loading_rate",
+    "unloading_rate",
+    "pressure_duration",
+    "avg_pressure_rolling_mean",
+    "temperature",
+    "spo2",
+    "heart_rate"
+]
 
 FEATURE_DISPLAY_NAMES = [
     "Average Pressure",
     "Max Pressure",
-    "Pressure Variability",
-    "Heel Pressure Ratio",
-    "Midfoot Pressure Ratio",
-    "Forefoot Pressure Ratio",
-    "Toe Pressure Ratio",
+    "Min Pressure",
+    "Pressure Variance",
+    "Pressure Standard Deviation",
+    "Pressure Gradient",
+    "Pressure Change Rate",
+    "Pressure Stability",
+    "Center of Pressure",
+    "Pressure Symmetry",
+    "Temperature Change Rate",
+    "Rolling Temperature Mean",
+    "Heart Rate Change Rate",
+    "Rolling Heart Rate Mean",
+    "SpO2 Change Rate",
+    "Rolling SpO2 Mean",
+    "Pressure x Temperature",
+    "Pressure x Heart Rate",
+    "Temperature x Heart Rate",
+    "Pressure Integral",
+    "Recovery Factor",
+    "Loading Rate",
+    "Unloading Rate",
+    "Pressure Duration",
+    "Sustained Pressure (Rolling)",
     "Skin Temperature",
     "SpO2 Level",
     "Heart Rate",
-    "Temperature Trend",
-    "Heart Rate Trend",
-    "SpO2 Trend",
-    "Sustained Pressure (Rolling)",
-    "Sustained Temperature",
-    "Sustained Heart Rate",
-    "Sustained SpO2",
-    "Tissue Recovery Factor",
 ]
 
 CLASS_NAMES = ["Low", "Medium", "High"]

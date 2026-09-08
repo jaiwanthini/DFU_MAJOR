@@ -25,10 +25,11 @@ from tensorflow.keras.layers import (
     Dropout,
     BatchNormalization
 )
+from tensorflow.keras.regularizers import l2
 
 from tensorflow.keras.optimizers import Adam
 
-from config import LEARNING_RATE
+from config import LEARNING_RATE, RECURRENT_DROPOUT
 
 
 # ==========================================================
@@ -48,19 +49,14 @@ def build_model(input_shape):
             # --------------------------------------
 
             Bidirectional(
-
                 LSTM(
-
-                    128,
-
-                    return_sequences=True
-
+                    64,
+                    return_sequences=True,
+                    recurrent_dropout=RECURRENT_DROPOUT
                 )
-
             ),
 
             BatchNormalization(),
-
             Dropout(0.30),
 
             # --------------------------------------
@@ -68,19 +64,14 @@ def build_model(input_shape):
             # --------------------------------------
 
             Bidirectional(
-
                 LSTM(
-
-                    64,
-
-                    return_sequences=False
-
+                    32,
+                    return_sequences=False,
+                    recurrent_dropout=RECURRENT_DROPOUT
                 )
-
             ),
 
             BatchNormalization(),
-
             Dropout(0.30),
 
             # --------------------------------------
@@ -88,29 +79,16 @@ def build_model(input_shape):
             # --------------------------------------
 
             Dense(
-
-                64,
-
-                activation="relu"
-
-            ),
-
-            Dropout(0.20),
-
-            Dense(
-
                 32,
-
-                activation="relu"
-
+                activation="relu",
+                kernel_regularizer=l2(1e-4)
             ),
 
+            Dropout(0.30),
+
             Dense(
-
                 3,
-
                 activation="softmax"
-
             )
 
         ]
@@ -118,21 +96,20 @@ def build_model(input_shape):
     )
 
     model.compile(
-
+        # Task 4: Use Adam with gradient clipping
         optimizer=Adam(
-
-            learning_rate=LEARNING_RATE
-
+            learning_rate=LEARNING_RATE,
+            clipnorm=1.0
         ),
 
-        loss="sparse_categorical_crossentropy",
+        loss="categorical_crossentropy",
 
+        # Task 5: Improve metrics
         metrics=[
-
-            "accuracy"
-
+            "accuracy",
+            tf.keras.metrics.Precision(name="precision"),
+            tf.keras.metrics.Recall(name="recall")
         ]
-
     )
 
     return model

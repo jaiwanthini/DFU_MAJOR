@@ -1,0 +1,33 @@
+=================================================
+      PADA DRISHTI DATASET SUMMARY REPORT        
+=================================================
+
+--- Global Statistics ---
+Total Rows (Processed): 100,000
+Total Unique Patients : 726
+Total Sessions        : 2,226
+Total LSTM Sequences  : 85,714
+Sequence Length       : 3 timesteps
+Number of Features    : 28
+
+--- Class Distributions ---
+
+[Processed Dataset]
+  Low    (0):  74,122 (74.12%)
+  Medium (1):  11,417 (11.42%)
+  High   (2):  14,461 (14.46%)
+
+[Training Sequences]
+  Low    (0):  46,040 (77.50%)
+  Medium (1):   5,158 ( 8.68%)
+  High   (2):   8,206 (13.81%)
+
+[Validation Sequences]
+  Low    (0):   9,268 (77.19%)
+  Medium (1):     954 ( 7.95%)
+  High   (2):   1,785 (14.87%)
+
+[Test Sequences]
+  Low    (0):  11,377 (79.54%)
+  Medium (1):   1,096 ( 7.66%)
+  High   (2):   1,830 (12.79%)

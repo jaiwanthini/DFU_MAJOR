@@ -1,0 +1,13 @@
+Stage,Class,Label,Count,Percentage
+Processed Dataset,Low,0,74122,74.122
+Processed Dataset,Medium,1,11417,11.417
+Processed Dataset,High,2,14461,14.460999999999999
+Training Sequences,Low,0,46040,77.50319843781564
+Training Sequences,Medium,1,5158,8.68291697528786
+Training Sequences,High,2,8206,13.813884586896505
+Validation Sequences,Low,0,9268,77.18830682102107
+Validation Sequences,Medium,1,954,7.945365203631215
+Validation Sequences,High,2,1785,14.866327975347716
+Test Sequences,Low,0,11377,79.54275326854507
+Test Sequences,Medium,1,1096,7.66272809900021
+Test Sequences,High,2,1830,12.794518632454729

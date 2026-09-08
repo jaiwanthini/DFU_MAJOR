@@ -12,7 +12,7 @@ import logging
 import numpy as np
 import shap
 
-from config import WINDOW_SIZE, NUM_FEATURES, FEATURE_DISPLAY_NAMES
+from config import SEQUENCE_WINDOW, NUM_FEATURES, FEATURE_DISPLAY_NAMES
 
 class DfuShapExplainer:
     """
@@ -34,8 +34,8 @@ class DfuShapExplainer:
         of the training data, which serves as an excellent neutral baseline for SHAP.
         """
         try:
-            # Baseline: shape (1, WINDOW_SIZE, NUM_FEATURES) of zeros
-            baseline = [np.zeros((1, WINDOW_SIZE, NUM_FEATURES), dtype=np.float32)]
+            # Baseline: shape (1, SEQUENCE_WINDOW, NUM_FEATURES) of zeros
+            baseline = [np.zeros((1, SEQUENCE_WINDOW, NUM_FEATURES), dtype=np.float32)]
             self.explainer = shap.GradientExplainer(self.model, baseline)
             self.logger.info("SHAP GradientExplainer initialized successfully.")
         except Exception as e:
@@ -64,7 +64,7 @@ class DfuShapExplainer:
         if self.explainer is None:
             return self._fallback_explanation(risk_label)
             
-        expected_shape = (1, WINDOW_SIZE, NUM_FEATURES)
+        expected_shape = (1, SEQUENCE_WINDOW, NUM_FEATURES)
         if sequence.shape != expected_shape:
             raise ValueError(
                 f"Invalid sequence shape for SHAP explanation. "
@@ -88,9 +88,9 @@ class DfuShapExplainer:
             
             if len(shap_array.shape) == 1 and shap_array.shape[0] == NUM_FEATURES:
                 temporal_mean_shap = shap_array
-            elif len(shap_array.shape) == 2 and shap_array.shape[0] == WINDOW_SIZE and shap_array.shape[1] == NUM_FEATURES:
+            elif len(shap_array.shape) == 2 and shap_array.shape[0] == SEQUENCE_WINDOW and shap_array.shape[1] == NUM_FEATURES:
                 temporal_mean_shap = np.mean(shap_array, axis=0)
-            elif len(shap_array.shape) == 3 and shap_array.shape[0] == WINDOW_SIZE and shap_array.shape[1] == NUM_FEATURES:
+            elif len(shap_array.shape) == 3 and shap_array.shape[0] == SEQUENCE_WINDOW and shap_array.shape[1] == NUM_FEATURES:
                 # E.g., (30, 18, 3) where 3 is the class dimension
                 try:
                     class_specific = shap_array[:, :, predicted_class_idx]

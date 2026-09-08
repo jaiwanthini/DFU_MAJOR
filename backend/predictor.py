@@ -10,7 +10,7 @@ This module DOES NOT perform feature engineering or scaling.
 Incoming sequences must already be preprocessed and scaled.
 
 Input Shape:
-(1, WINDOW_SIZE, NUM_FEATURES)
+(1, SEQUENCE_WINDOW, NUM_FEATURES)
 
 Output:
 Risk label
@@ -40,7 +40,7 @@ if ROOT_DIR not in sys.path:
 from config import (
     MODEL_PATH,
     SCALER_PATH,
-    WINDOW_SIZE,
+    SEQUENCE_WINDOW,
     NUM_FEATURES,
     CLASS_NAMES
 )
@@ -143,7 +143,7 @@ class DfuPredictor:
 
         expected_shape = (
             1,
-            WINDOW_SIZE,
+            SEQUENCE_WINDOW,
             NUM_FEATURES
         )
 

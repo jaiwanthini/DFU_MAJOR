@@ -25,7 +25,7 @@ import joblib
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import RobustScaler
 from sklearn.utils.class_weight import compute_class_weight
 
 warnings.filterwarnings("ignore")
@@ -45,8 +45,10 @@ sys.path.append(ROOT_DIR)
 
 from config import (
     PROCESSED_DATA_PATH,
-    WINDOW_SIZE,
-    TRAIN_TEST_SPLIT,
+    SEQUENCE_WINDOW,
+    TRAIN_SPLIT,
+    VAL_SPLIT,
+    TEST_SPLIT,
     RANDOM_STATE,
     SEQUENCE_DATA_PATH,
     SCALER_PATH,
@@ -63,6 +65,8 @@ from config import (
     LOW_RISK_THRESHOLD,
     MEDIUM_RISK_THRESHOLD,
     IMBALANCE_THRESHOLD,
+    # Feature columns
+    MODEL_FEATURE_COLUMNS,
 )
 
 # Resolve all paths to absolute so CWD never matters
@@ -86,27 +90,6 @@ from utils import (
 # LSTM Feature Columns
 # ==========================================================
 
-FEATURE_COLUMNS: List[str] = [
-    "avg_pressure",
-    "max_pressure",
-    "pressure_std",
-    "heel_ratio",
-    "mid_ratio",
-    "forefoot_ratio",
-    "toe_ratio",
-    "temperature",
-    "spo2",
-    "heart_rate",
-    "temp_diff",
-    "hr_diff",
-    "spo2_diff",
-    "avg_pressure_rolling_mean",
-    "temperature_rolling_mean",
-    "heart_rate_rolling_mean",
-    "spo2_rolling_mean",
-    "recovery_factor",
-]
-
 # Label names for display
 LABEL_NAMES: Dict[int, str] = {0: "Low", 1: "Medium", 2: "High"}
 
@@ -119,6 +102,7 @@ def load_dataset() -> pd.DataFrame:
     """Load the processed CSV dataset and print basic info."""
     banner()
     df = load_csv(PROCESSED_DATA_PATH)
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
     dataset_info(df, "Processed Dataset")
     return df
 
@@ -471,8 +455,8 @@ def generate_sequences(
     """
     Create sliding-window LSTM sequences per patient.
 
-    Each sequence spans WINDOW_SIZE timesteps; the label is the
-    risk class at the NEXT timestep (predictive labelling).
+    Each sequence spans SEQUENCE_WINDOW timesteps; the target label is the
+    risk class at the NEXT timestep immediately following the sequence (predictive labelling).
 
     Parameters
     ----------
@@ -481,7 +465,7 @@ def generate_sequences(
 
     Returns
     -------
-    X : np.ndarray, shape (n_sequences, WINDOW_SIZE, n_features)
+    X : np.ndarray, shape (n_sequences, SEQUENCE_WINDOW, n_features)
     y : np.ndarray, shape (n_sequences,)
     patient_ids : np.ndarray, shape (n_sequences,)
     """
@@ -490,6 +474,8 @@ def generate_sequences(
     X: List[np.ndarray] = []
     y: List[int] = []
     patient_ids: List[str] = []
+    
+    discarded_sequences = 0
 
     patients = df["patient_id"].unique()
 
@@ -499,12 +485,33 @@ def generate_sequences(
             .reset_index(drop=True)
         )
 
-        features = patient_df[FEATURE_COLUMNS].values
+        features = patient_df[MODEL_FEATURE_COLUMNS].values
         labels   = patient_df["risk_label"].values
+        timestamps = patient_df["timestamp"].values
+        sessions = patient_df["session_id"].values if "session_id" in patient_df.columns else np.zeros(len(patient_df))
 
-        for i in range(len(patient_df) - WINDOW_SIZE):
-            sequence = features[i : i + WINDOW_SIZE]
-            target   = labels[i + WINDOW_SIZE]      # predict NEXT timestamp
+        for i in range(len(patient_df) - SEQUENCE_WINDOW):
+            sequence_labels = labels[i : i + SEQUENCE_WINDOW]
+            sequence_sessions = sessions[i : i + SEQUENCE_WINDOW]
+            
+            # Ensure sequence doesn't cross state boundaries (labels must be identical)
+            if not np.all(sequence_labels == sequence_labels[0]):
+                discarded_sequences += 1
+                continue
+                
+            # Ensure sequence doesn't cross session boundaries
+            if not np.all(sequence_sessions == sequence_sessions[0]):
+                discarded_sequences += 1
+                continue
+                
+            # Double check time difference in seconds between last and first reading in the window
+            time_diff = (timestamps[i + SEQUENCE_WINDOW - 1] - timestamps[i]).astype('timedelta64[s]').astype(int)
+            if time_diff > (SEQUENCE_WINDOW - 1):
+                discarded_sequences += 1
+                continue
+                
+            sequence = features[i : i + SEQUENCE_WINDOW]
+            target   = labels[i + SEQUENCE_WINDOW]      # predict NEXT timestamp
 
             X.append(sequence)
             y.append(target)
@@ -514,55 +521,68 @@ def generate_sequences(
     y_arr  = np.array(y,           dtype=np.int32)
     pid_arr= np.array(patient_ids)
 
-    print(f"\n  Sequences Created : {len(X_arr):,}")
-    print(f"  Sequence Shape    : {X_arr.shape}")
+    print(f"\n  Sequences Created   : {len(X_arr):,}")
+    print(f"  Sequences Discarded : {discarded_sequences:,} (Cross-state or Cross-session boundaries)")
+    print(f"  Sequence Shape      : {X_arr.shape}")
 
     return X_arr, y_arr, pid_arr
 
 
 # ==========================================================
-# 9. Patient-wise Train/Test Split
+# 9. Patient-wise Train/Val/Test Split
 # ==========================================================
 
 def patient_split(
     X: np.ndarray,
     y: np.ndarray,
     patient_ids: np.ndarray,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Split sequences by unique patient identity to prevent data leakage.
-
-    Parameters
-    ----------
-    X, y, patient_ids : arrays from generate_sequences()
-
-    Returns
-    -------
-    X_train, X_test, y_train, y_test
+    Uses 70/15/15 split.
     """
     print("\nPerforming Patient-wise Split...")
 
     unique_patients = np.unique(patient_ids)
 
-    train_patients, test_patients = train_test_split(
+    # First split off the test set
+    train_val_patients, test_patients = train_test_split(
         unique_patients,
-        test_size=TRAIN_TEST_SPLIT,
+        test_size=TEST_SPLIT,
+        random_state=RANDOM_STATE,
+        shuffle=True,
+    )
+    
+    # Then split the remainder into train and val
+    # (val size relative to remaining patients)
+    val_ratio = VAL_SPLIT / (TRAIN_SPLIT + VAL_SPLIT)
+    train_patients, val_patients = train_test_split(
+        train_val_patients,
+        test_size=val_ratio,
         random_state=RANDOM_STATE,
         shuffle=True,
     )
 
     train_mask = np.isin(patient_ids, train_patients)
+    val_mask   = np.isin(patient_ids, val_patients)
     test_mask  = np.isin(patient_ids, test_patients)
 
-    X_train, X_test = X[train_mask], X[test_mask]
-    y_train, y_test = y[train_mask], y[test_mask]
+    X_train, X_val, X_test = X[train_mask], X[val_mask], X[test_mask]
+    y_train, y_val, y_test = y[train_mask], y[val_mask], y[test_mask]
 
     print(f"  Train Patients   : {len(train_patients)}")
+    print(f"  Val Patients     : {len(val_patients)}")
     print(f"  Test Patients    : {len(test_patients)}")
     print(f"  Training Samples : {len(X_train):,}")
+    print(f"  Validation Samples: {len(X_val):,}")
     print(f"  Testing Samples  : {len(X_test):,}")
+    
+    # Verify no overlap
+    assert len(set(train_patients) & set(val_patients)) == 0, "Patient overlap between train and val!"
+    assert len(set(train_patients) & set(test_patients)) == 0, "Patient overlap between train and test!"
+    assert len(set(val_patients) & set(test_patients)) == 0, "Patient overlap between val and test!"
 
-    return X_train, X_test, y_train, y_test
+    return X_train, X_val, X_test, y_train, y_val, y_test
 
 
 # ==========================================================
@@ -571,35 +591,30 @@ def patient_split(
 
 def scale_features(
     X_train: np.ndarray,
+    X_val: np.ndarray,
     X_test: np.ndarray,
-) -> Tuple[np.ndarray, np.ndarray, StandardScaler]:
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, RobustScaler]:
     """
-    Fit a StandardScaler on training data and transform both splits.
-
-    The scaler is fit on the flattened 2-D view of X_train to
-    compute per-feature statistics, then applied identically to
-    X_test to prevent leakage.
-
-    Returns
-    -------
-    X_train_scaled, X_test_scaled, scaler
+    Fit a RobustScaler on training data and transform all splits.
     """
     print("\nScaling Features...")
 
     n_features = X_train.shape[2]
-    scaler = StandardScaler()
+    scaler = RobustScaler()
 
     X_train_2d = X_train.reshape(-1, n_features)
+    X_val_2d   = X_val.reshape(-1, n_features)
     X_test_2d  = X_test.reshape(-1,  n_features)
 
     scaler.fit(X_train_2d)
 
     X_train_scaled = scaler.transform(X_train_2d).reshape(X_train.shape)
+    X_val_scaled   = scaler.transform(X_val_2d).reshape(X_val.shape)
     X_test_scaled  = scaler.transform(X_test_2d ).reshape(X_test.shape)
 
     print("  Features scaled successfully.")
 
-    return X_train_scaled, X_test_scaled, scaler
+    return X_train_scaled, X_val_scaled, X_test_scaled, scaler
 
 
 # ==========================================================
@@ -608,23 +623,16 @@ def scale_features(
 
 def save_datasets(
     X_train: np.ndarray,
+    X_val: np.ndarray,
     X_test: np.ndarray,
     y_train: np.ndarray,
+    y_val: np.ndarray,
     y_test: np.ndarray,
-    scaler: StandardScaler,
+    scaler: RobustScaler,
     class_weights: Dict[int, float],
 ) -> None:
     """
     Persist all sequence arrays, the scaler, and class weights to disk.
-
-    Outputs
-    -------
-    data/sequences/X_train.npy
-    data/sequences/X_test.npy
-    data/sequences/y_train.npy
-    data/sequences/y_test.npy
-    models/scaler.pkl
-    models/class_weights.pkl
     """
     print("\nSaving datasets...")
 
@@ -632,8 +640,10 @@ def save_datasets(
     os.makedirs(os.path.dirname(SCALER_PATH), exist_ok=True)
 
     np.save(os.path.join(SEQUENCE_DATA_PATH, "X_train.npy"), X_train)
+    np.save(os.path.join(SEQUENCE_DATA_PATH, "X_val.npy"),   X_val)
     np.save(os.path.join(SEQUENCE_DATA_PATH, "X_test.npy"),  X_test)
     np.save(os.path.join(SEQUENCE_DATA_PATH, "y_train.npy"), y_train)
+    np.save(os.path.join(SEQUENCE_DATA_PATH, "y_val.npy"),   y_val)
     np.save(os.path.join(SEQUENCE_DATA_PATH, "y_test.npy"),  y_test)
 
     joblib.dump(scaler,        SCALER_PATH)
@@ -641,11 +651,90 @@ def save_datasets(
 
     print("\n  Datasets Saved Successfully!")
     print(f"  X_train : {X_train.shape}")
+    print(f"  X_val   : {X_val.shape}")
     print(f"  X_test  : {X_test.shape}")
     print(f"  y_train : {y_train.shape}")
+    print(f"  y_val   : {y_val.shape}")
     print(f"  y_test  : {y_test.shape}")
     print(f"\n  Scaler        -> {SCALER_PATH}")
     print(f"  Class weights -> {CLASS_WEIGHTS_PATH}")
+
+# ==========================================================
+# 12. Generate Final Report
+# ==========================================================
+
+def generate_report(
+    df: pd.DataFrame,
+    X_train: np.ndarray, y_train: np.ndarray,
+    X_val: np.ndarray, y_val: np.ndarray,
+    X_test: np.ndarray, y_test: np.ndarray
+) -> None:
+    """Generate text and CSV reports on the final distributions."""
+    reports_dir = os.path.join(ROOT_DIR, "reports")
+    os.makedirs(reports_dir, exist_ok=True)
+    
+    # 1. Save CSV Distribution
+    dist_data = []
+    
+    # Processed Dataset
+    total_df = len(df)
+    counts_df = df["risk_label"].value_counts().to_dict()
+    for lbl in [0, 1, 2]:
+        dist_data.append({
+            "Stage": "Processed Dataset",
+            "Class": LABEL_NAMES[lbl],
+            "Label": lbl,
+            "Count": counts_df.get(lbl, 0),
+            "Percentage": (counts_df.get(lbl, 0) / total_df) * 100 if total_df > 0 else 0
+        })
+        
+    # Helper for splits
+    def _add_split(name, y_arr):
+        tot = len(y_arr)
+        unique, counts = np.unique(y_arr, return_counts=True)
+        c_dict = dict(zip(unique, counts))
+        for lbl in [0, 1, 2]:
+            dist_data.append({
+                "Stage": name,
+                "Class": LABEL_NAMES[lbl],
+                "Label": lbl,
+                "Count": c_dict.get(lbl, 0),
+                "Percentage": (c_dict.get(lbl, 0) / tot) * 100 if tot > 0 else 0
+            })
+            
+    _add_split("Training Sequences", y_train)
+    _add_split("Validation Sequences", y_val)
+    _add_split("Test Sequences", y_test)
+    
+    dist_df = pd.DataFrame(dist_data)
+    dist_df.to_csv(os.path.join(reports_dir, "dataset_distribution.csv"), index=False)
+    
+    # 2. Text Summary
+    summary_path = os.path.join(reports_dir, "dataset_summary.txt")
+    with open(summary_path, "w") as f:
+        f.write("=================================================\n")
+        f.write("      PADA DRISHTI DATASET SUMMARY REPORT        \n")
+        f.write("=================================================\n\n")
+        
+        f.write("--- Global Statistics ---\n")
+        f.write(f"Total Rows (Processed): {total_df:,}\n")
+        f.write(f"Total Unique Patients : {df['patient_id'].nunique():,}\n")
+        if "session_id" in df.columns:
+            f.write(f"Total Sessions        : {df.groupby('patient_id')['session_id'].nunique().sum():,}\n")
+        
+        total_seq = len(y_train) + len(y_val) + len(y_test)
+        f.write(f"Total LSTM Sequences  : {total_seq:,}\n")
+        f.write(f"Sequence Length       : {SEQUENCE_WINDOW} timesteps\n")
+        f.write(f"Number of Features    : {X_train.shape[2]}\n\n")
+        
+        f.write("--- Class Distributions ---\n")
+        for stage in dist_df["Stage"].unique():
+            f.write(f"\n[{stage}]\n")
+            sub = dist_df[dist_df["Stage"] == stage]
+            for _, r in sub.iterrows():
+                f.write(f"  {r['Class']:<6} ({r['Label']}): {int(r['Count']):>7,} ({r['Percentage']:>5.2f}%)\n")
+                
+    print(f"\nReport Generated at: {summary_path}")
 
 
 # ==========================================================
@@ -664,17 +753,20 @@ def main() -> None:
     # Step 3: Generate sliding-window sequences
     X, y, patient_ids = generate_sequences(df)
 
-    # Step 4: Patient-wise train/test split (no leakage)
-    X_train, X_test, y_train, y_test = patient_split(X, y, patient_ids)
+    # Step 4: Patient-wise train/val/test split (no leakage)
+    X_train, X_val, X_test, y_train, y_val, y_test = patient_split(X, y, patient_ids)
 
     # Step 5: Compute class weights from training labels only
     class_weights = compute_class_weights(y_train)
 
-    # Step 6: Scale features (fit on train, transform both)
-    X_train, X_test, scaler = scale_features(X_train, X_test)
+    # Step 6: Scale features (fit on train, transform all)
+    X_train, X_val, X_test, scaler = scale_features(X_train, X_val, X_test)
 
     # Step 7: Save all artifacts
-    save_datasets(X_train, X_test, y_train, y_test, scaler, class_weights)
+    save_datasets(X_train, X_val, X_test, y_train, y_val, y_test, scaler, class_weights)
+
+    # Step 8: Generate Reports
+    generate_report(df, X_train, y_train, X_val, y_val, X_test, y_test)
 
     finished()
 

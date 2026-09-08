@@ -52,7 +52,7 @@ def get_early_stopping():
 
         monitor="val_loss",
 
-        patience=10,
+        patience=15, # Task 7: Increased patience from 10 to 15
 
         restore_best_weights=True,
 
@@ -92,11 +92,11 @@ def get_checkpoint():
 
         filepath=MODEL_PATH,
 
-        monitor="val_accuracy",
+        monitor="val_loss", # Task 6: Monitor val_loss instead of val_accuracy
 
         save_best_only=True,
 
-        mode="max",
+        mode="min", # Changed mode to min for loss
 
         verbose=1
 

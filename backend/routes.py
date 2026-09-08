@@ -10,7 +10,7 @@ History tracking, System Health, and System Reset.
 
 from flask import Blueprint, request, jsonify, current_app
 
-from config import WINDOW_SIZE
+from config import SEQUENCE_WINDOW
 from backend.simulator import SensorSimulator
 from backend.preprocess_live import LivePreprocessor
 from backend.shap_explainer import DfuShapExplainer
@@ -90,13 +90,13 @@ def predict():
     # If window is not yet full, return a highly informative buffering status
     if result is None:
         samples = preprocessor.get_buffer_size()
-        progress = round((samples / WINDOW_SIZE) * 100, 1) if WINDOW_SIZE > 0 else 0
+        progress = round((samples / SEQUENCE_WINDOW) * 100, 1) if SEQUENCE_WINDOW > 0 else 0
         
         return jsonify({
             "status": "buffering",
             "message": "Collecting enough sensor samples for prediction.",
             "samples_received": samples,
-            "required_samples": WINDOW_SIZE,
+            "required_samples": SEQUENCE_WINDOW,
             "progress": progress
         }), 202
 

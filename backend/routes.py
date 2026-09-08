@@ -8,6 +8,7 @@ History tracking, System Health, and System Reset.
 ==========================================================
 """
 
+import time
 from flask import Blueprint, request, jsonify, current_app
 
 from config import SEQUENCE_WINDOW
@@ -19,10 +20,14 @@ from backend.history import history_manager
 api_bp = Blueprint('api_bp', __name__)
 
 # ==========================================================
-# Singletons for live state
+# Singletons & Hardware Cache for live state
 # ==========================================================
 simulator = SensorSimulator(mode="Normal")
 preprocessor = LivePreprocessor()
+
+_latest_hardware_reading = None
+_last_hardware_time = 0.0
+_HARDWARE_TIMEOUT_SECONDS = 3.5
 
 # Initialize extensions dict safely in case it doesn't exist
 def _get_extensions():
@@ -32,14 +37,52 @@ def _get_extensions():
 
 
 # ==========================================================
-# Simulator Endpoint
+# Hardware Ingestion Endpoint
+# ==========================================================
+@api_bp.route('/api/hardware-reading', methods=['POST'])
+def receive_hardware_reading():
+    """
+    Ingests live telemetry from the ESP32 via ble_receiver.py.
+    """
+    global _latest_hardware_reading, _last_hardware_time
+
+    if not request.is_json:
+        return jsonify({"error": "Content-Type must be application/json."}), 415
+
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No JSON payload provided."}), 400
+
+    _latest_hardware_reading = data
+    _last_hardware_time = time.time()
+
+    return jsonify({"status": "received", "source": "hardware"}), 200
+
+
+# ==========================================================
+# Sensor Feed / Simulator Endpoint (Auto-switching)
 # ==========================================================
 @api_bp.route('/simulate', methods=['GET'])
+@api_bp.route('/sensor-feed', methods=['GET'])
 def simulate():
     """
-    Generates and returns one frame of simulated sensor data.
-    Query param ?mode= can dynamically change the clinical state.
+    Returns one frame of sensor data.
+    Automatically provides live ESP32 telemetry when active;
+    smoothly falls back to the software simulator when disconnected.
     """
+    global _latest_hardware_reading, _last_hardware_time
+
+    is_hardware_active = (
+        _latest_hardware_reading is not None
+        and (time.time() - _last_hardware_time) <= _HARDWARE_TIMEOUT_SECONDS
+    )
+
+    if is_hardware_active:
+        reading = dict(_latest_hardware_reading)
+        reading["source"] = "hardware"
+        reading["connected"] = True
+        return jsonify(reading), 200
+
     mode = request.args.get('mode')
     if mode:
         try:
@@ -48,6 +91,8 @@ def simulate():
             return jsonify({"error": str(e)}), 400
             
     reading = simulator.get_reading()
+    reading["source"] = "simulation"
+    reading["connected"] = False
     return jsonify(reading), 200
 
 
@@ -183,12 +228,19 @@ def health_check():
     predictor_status = "ready" if predictor and getattr(predictor, "is_ready", False) else "unavailable"
     shap_status = "ready" if "shap_explainer" in exts else "unavailable"
     
+    is_hardware_active = (
+        _latest_hardware_reading is not None
+        and (time.time() - _last_hardware_time) <= _HARDWARE_TIMEOUT_SECONDS
+    )
+    
     return jsonify({
         "status": "healthy",
         "predictor": predictor_status,
         "shap": shap_status,
         "history_records": history_manager.size(),
-        "simulator_mode": simulator.mode
+        "simulator_mode": simulator.mode,
+        "hardware_connected": is_hardware_active,
+        "active_source": "hardware" if is_hardware_active else "simulation"
     }), 200
 
 

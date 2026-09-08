@@ -603,13 +603,16 @@ async function startLiveUpdates() {
         battery: Math.round(liveBattery)
       };
 
+      const isHardware = (sensorData.source === 'hardware' || sensorData.connected === true);
+      const normFSR = (val) => Math.min(100, Math.max(0, Math.round(val > 100 ? val / 10 : val)));
+
       updateSensors(mappedSensors);
 
       updateHeatmap({
-        forefootL: Math.min(100, mappedSensors.fsr1 + 15),
-        forefootR: Math.min(100, mappedSensors.fsr2 + 15),
+        forefootL: normFSR(mappedSensors.fsr1),
+        forefootR: normFSR(mappedSensors.fsr2),
         mid: 30 + Math.round(Math.random() * 10),
-        heel: Math.min(100, Math.max(mappedSensors.fsr3, mappedSensors.fsr4) + 10),
+        heel: Math.min(100, Math.max(normFSR(mappedSensors.fsr3), normFSR(mappedSensors.fsr4))),
       });
 
       // 2. Run Prediction
@@ -663,9 +666,9 @@ async function startLiveUpdates() {
       updateSystemStatus([
         { name: "LSTM Model", icon: "brain-circuit", state: "live", text: "Active" },
         { name: "Inference Backend", icon: "server", state: "live", text: "Connected" },
-        { name: "Insole Simulator", icon: "cpu", state: "live", text: "Streaming" },
+        { name: isHardware ? "ESP32 Hardware" : "Insole Simulator", icon: "cpu", state: "live", text: isHardware ? "Live Telemetry" : "Streaming" },
         { name: "Flask API", icon: "plug-zap", state: "live", text: "200 OK" },
-        { name: "BLE Radio", icon: "bluetooth", state: "live", text: "Paired" },
+        { name: "BLE Radio", icon: "bluetooth", state: isHardware ? "live" : "warn", text: isHardware ? "Connected" : "Standby" },
         { name: "Insole Battery", icon: "battery-medium", state: liveBattery > 20 ? "live" : "warn", text: `${Math.round(liveBattery)}%` },
       ]);
 

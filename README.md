@@ -288,14 +288,14 @@ The system is currently powered by a software simulator that emits the exact dat
 
 <br/>
 
-## 👤 Author
+## 👤 Authors
 
 | | |
 |---|---|
-| **Name** | `<Jaiwanthini>` |
-| **University** | `<Sahyadri College Of Engineering And Management>` |
-| **Department** | `<CSE(AIML)>` |
-| **Guide** | `<Dr.Gurusiddayya Hiremath>` |
+| **Names** | `<Jaiwanthini>`,`<Muhammad Faazil>` |
+| **University** | `<Sahyadri College Of Engineering And Management, Mangaluru>` |
+| **Department** | `<CSE (AIML)>` |
+| **Guide** | `<Dr. Gurusiddayya Hiremath>` |
 
 <br/>
 
